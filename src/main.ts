@@ -108,12 +108,6 @@ export default class Mononote extends Plugin {
         return resolve();
       }
 
-      // Find the target tab that we'll need to focus in a moment
-      const targetToFocus = (
-        duplicateLeaves.find((l) => l.pinned) ||
-        duplicateLeaves.find((l) => !l.pinned)
-      ) as RealLifeWorkspaceLeaf;
-
       // Deferring the operation for a bit to give Obsidian time to update the
       // tab's history. Without this `setTimeout()`, the history would not be
       // updated properly yet, and the "has history?" check below would fail.
@@ -124,35 +118,19 @@ export default class Mononote extends Plugin {
         const ephemeralState = { ...activeLeaf.getEphemeralState() };
         const hasEphemeralState = Object.keys(ephemeralState).length > 0;
 
-        // If the active leaf has history, go back, then focus the target tab
-        if (
-          activeLeaf.view.navigation &&
-          activeLeaf.history.backHistory.length > 0
-        ) {
-          // This will trigger another `active-leaf-change` event, but since this
-          // leaf is already being processed, that new event will be ignored
-          activeLeaf.history.back();
-          logMsg("history.back");
-        } //
-        // The active leaf has no history but is pinned, so we'll leave it
-        // alone and just back off here.
-        else if (activeLeaf.pinned) {
-          logMsg("pinned tab, not detaching");
-          return resolve();
-        } //
-        // The active leaf has no history, so we'll close it after focussing the
-        // new target tab
-        else {
-          activeLeaf.detach();
-          logMsg("detach");
-        }
+        // Close all duplicate leaves (old tabs)
+        // Close all old duplicate tabs, regardless of whether they are pinned
+        duplicateLeaves.forEach((leaf) => {
+          leaf.detach();
+          logMsg(`detached duplicate leaf: ${leaf.id}`);
+        });
 
-        // Focus the target tab after a short delay. Without the delay, the tab
+        // Focus the new active leaf after a short delay. Without the delay, the tab
         // operation would fail silently, i.e. the tab would not be focused.
         setTimeout(() => {
-          workspace.setActiveLeaf(targetToFocus, { focus: true });
+          workspace.setActiveLeaf(activeLeaf, { focus: true });
           if (hasEphemeralState) {
-            targetToFocus.setEphemeralState(ephemeralState);
+            activeLeaf.setEphemeralState(ephemeralState);
           }
         }, this.settings.delayInMs);
 
